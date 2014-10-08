@@ -103,6 +103,18 @@ VMediator = (function() {
     });
   };
 
+  VMediator.resetChannels = function() {
+    VMediator.channels = {};
+  }
+
+  VMediator.removeSubscribers = function(channelName) {
+    if(!VMediator.channels[channelName]) {
+      throw new Error('No channel like that');
+    } else {
+      VMediator.channels[channelName] = null;
+    }
+  }
+
   VMediator.publish = function(channelName) {
     if(!VMediator.channels[channelName]) {
       throw new Error('No channel like that');
@@ -121,6 +133,7 @@ VMediator = (function() {
 root = typeof exports !== "undefined" && exports !== null ? exports : window;
 root.VMediator = VMediator;
 module.exports = root
+
 },{}],2:[function(require,module,exports){
 module.exports = require('./build/LightYear');
 
@@ -146,7 +159,6 @@ Enemy.prototype = {
 		y: this.player.sprite.y,
 	    }
 	    this.game.physics.arcade.moveToObject(this.sprite, newPos, 500);
-	    console.log(this.ticks)
 	    this.ticks = this.ticks - 1;
 	}
     },
@@ -157,8 +169,6 @@ Enemy.prototype = {
 	this.sprite = this.game.add.sprite(this.position.x, this.position.y, 'enemy');
 
 	this.game.physics.arcade.enable(this.sprite);
-
-	
 
 	this.sprite.enableBody = true;
 
@@ -172,7 +182,6 @@ Enemy.prototype = {
 	    y: this.player.sprite.y,
 	}
 	this.game.physics.arcade.moveToObject(this.sprite, newPos, 500);
-
     }
 }
 
@@ -192,7 +201,11 @@ var EnemyTower = function(game, player) {
 
 EnemyTower.prototype = {
 	preload: function() {
-		this.game.load.image('enemy_tower', 'assets/enemy_tower.png');
+	    this.game.load.image('enemy_tower', 'assets/enemy_tower.png');
+	},
+	remove: function() {
+	    this.stopShooting();
+	    this.bullets = [];
 	},
 	update: function() {
 	    this.bullets.forEach(function(bullet) {
@@ -211,9 +224,10 @@ EnemyTower.prototype = {
 	    enemy.kill();
 	},
 	create: function() {
-    this.sprite = this.game.add.sprite(this.game.world.randomX, this.game.world.randomY, 'enemy_tower');
+	    this.sprite = this.game.add.sprite(this.game.world.randomX, this.game.world.randomY, 'enemy_tower');
 	},
 	shoot: function() {
+	    console.log('Shooting!');
 	    enemy = new Enemy(this.game, this.player, this.sprite);
 	    this.bullets.push(enemy);
 	    enemy.create();
@@ -223,13 +237,12 @@ EnemyTower.prototype = {
 			if(this.shooting_speed > 600) {
 			    this.shooting_speed -= 100;
 			}
-			//if(this.shooting_speed > 10)
-			//{
-			//    this.shooting_speed -= 10;
-			//}
 			this.shoot();
 			this.startShooting();
 		}.bind(this), this.shooting_speed)
+	},
+	stopShooting: function() {
+	    clearInterval(this.shooting_interval);
 	}
 }
 
@@ -240,6 +253,8 @@ var Player = require('./player.js');
 var EnemyTower = require('./enemy_tower.js');
 var Enemy = require('./enemy.js');
 var Score = require('./score.js');
+var VMediator = require('lightyear')
+var lightyear = require('lightyear').VMediator;
 
 var Avoider = function(game) {
   this.game = game;
@@ -248,7 +263,6 @@ var Avoider = function(game) {
 Avoider.prototype = {
   preload: function() {
     console.log('Loading')
-  
   },
   create: function() {
     this.game.physics.startSystem(Phaser.Physics.ARCADE);
@@ -279,11 +293,8 @@ Preload.prototype = {
 MainMenu = function(game) {};
 MainMenu.prototype = {
   create: function() {
-    console.log('Click the button')
-    //this.add.sprite(0, 0, 'screen-mainmenu');
-    //this.add.sprite((320-221)/2, 40, 'title');
   var style = { font: "34px Arial", fill: "#ff0044", align: "left" };
-var text = "Avoid the lame red circles\nAlways have a score above -10\n\nYou have 100 seconds to show\nwho is the best at avoiding stuff"
+  var text = "Avoid the lame red circles\nAlways have a score above -10\n\nYou have 100 seconds to show\nwho is the best at avoiding stuff"
    this.game.add.text(10, 10, text, style);
     this.startButton = this.game.add.button(
 	this.game.world.centerX,
@@ -297,16 +308,55 @@ var text = "Avoid the lame red circles\nAlways have a score above -10\n\nYou hav
   }
 }
 
+ScoreState = function(game) {};
+ScoreState.prototype = {
+  create: function() {
+    var score = "Something";
+    var seconds = 40;
+    lightyear.subscribe('scorestate:update', function(details) {
+      var style = { font: "34px Arial", fill: "#ff0044", align: "left" };
+      var text = "You got the score " + details.score + " after " + details.seconds + " seconds.";
+      this.game.add.text(10, 10, text, style);
+    }.bind(this));
+
+    clearInterval(towerInterval)
+    lightyear.publish('score:stop');
+    towers.forEach(function(tower) {
+      tower.remove();
+    });
+
+    lightyear.resetChannels();
+
+
+    towers = [];
+
+    this.startButton = this.game.add.button(
+	this.game.world.centerX,
+	this.game.world.centerY,
+	'button_start',
+	this.startGame,
+	this, 1, 0, 2
+    );
+  },
+  startGame: function() {
+    this.game.state.start('Game');
+  }
+}
+
+var towers = [];
+var towerInterval = null;
 Game = function(game) {};
 Game.prototype = {
   create: function() {
     game.physics.startSystem(Phaser.Physics.ARCADE);
     player.create();
 
-    enemy_tower.create();
-    enemy_tower.startShooting();
+    first_tower = new EnemyTower(game, player);
+    first_tower.create();
+    first_tower.startShooting();
+    towers.push(first_tower)
 
-    setInterval(function() {
+    towerInterval = setInterval(function() {
       tower = new EnemyTower(game, player);
       tower.create();
       tower.startShooting();
@@ -328,40 +378,17 @@ Game.prototype = {
 var game = new Phaser.Game(800, 600, Phaser.AUTO, 'content');
 var avoider = new Avoider(game);
 
-function MainMenu() {
-  console.log('Hehe')
-}
-
 game.state.add('Preloader', Preload);
 game.state.add('MainMenu', MainMenu);
+game.state.add('ScoreState', ScoreState);
 game.state.add('Game', Game);
 
 game.state.start('Preloader');
 
-var towers = [];
-
-var debug = true;
 
 var player = null;
 
-function log(msg) {
-  if(debug) {
-    console.log(msg)
-  }
-}
-
-function create() {
-}
-
-function update() {
-}
-
-function render() {
-    game.debug.body(player);
-    game.debug.body(enemy_tower);
-}
-
-},{"./enemy.js":3,"./enemy_tower.js":4,"./player.js":6,"./score.js":7}],6:[function(require,module,exports){
+},{"./enemy.js":3,"./enemy_tower.js":4,"./player.js":6,"./score.js":7,"lightyear":2}],6:[function(require,module,exports){
 var Player = function(game) {
   this.game = game;
   this.sprite = null;
@@ -394,22 +421,29 @@ var Score = function(game) {
     this.game = game;
     this.sprite = null;
     this.score = 0;
+    this.clock = 0;
+    this.clockInterval = null;
 }
 
-var clock = 0;
 
 Score.prototype = {
     preload: function() {
     },
     updateScore: function() {
-	if(clock > 10) {
-	    this.score = this.score + Math.floor(clock / 10);
+	if(this.clock > 10) {
+	    this.score = this.score + Math.floor(this.clock / 10);
 	    this.updateText();
 	}
     },
+    checkIfGameOver: function() {
+	if(this.score <= -10 || this.clock >= 60) {
+	    this.game.state.start('ScoreState');
+	}
+    },
     onPlayerHit: function() {
-	if(clock > 10) {
-	    this.score = this.score - Math.floor(clock / 10);
+	console.log(Math.floor(this.clock / 10));
+	if(this.clock > 10) {
+	    this.score = this.score - Math.floor(this.clock / 10);
 	} else {
 	    this.score = this.score - 3;
 	}
@@ -417,22 +451,39 @@ Score.prototype = {
     },
     updateText: function() {
 	this.text.setText("Score: " + this.score)
+	this.checkIfGameOver();
     },
     updateClock: function() {
-	this.time.setText("Time: " + clock)
+	this.time.setText("Time: " + this.clock)
+	this.checkIfGameOver();
     },
-    update: function() {
+    sendScoreDetails: function() {
+	lightyear.publish('scorestate:update', {
+	    score: this.score,
+	    seconds: this.clock
+	});
+    },
+    stopClock: function() {
+	this.sendScoreDetails();
+	clearInterval(this.clockInterval);
     },
     create: function() {
+	this.score = 0;
+	this.clock = 0;
+
 	var style = { font: "65px Arial", fill: "#ff0044", align: "center" };
 	this.text = this.game.add.text(10, 10, "Score: 0", style);
 
 	this.time = this.game.add.text(10, 520, "Time: 0", style);
 
-	setInterval(function() {
-	    clock = clock + 1;
+	this.clockInterval = setInterval(function() {
+	    this.clock = this.clock + 1;
 	    this.updateClock();
 	}.bind(this), 1000)
+
+	lightyear.subscribe('score:stop', function() {
+	    this.stopClock();
+	}.bind(this));
 
 	lightyear.subscribe('score:update', function() {
 	    this.updateScore();

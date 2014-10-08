@@ -11,7 +11,11 @@ var EnemyTower = function(game, player) {
 
 EnemyTower.prototype = {
 	preload: function() {
-		this.game.load.image('enemy_tower', 'assets/enemy_tower.png');
+	    this.game.load.image('enemy_tower', 'assets/enemy_tower.png');
+	},
+	remove: function() {
+	    this.stopShooting();
+	    this.bullets = [];
 	},
 	update: function() {
 	    this.bullets.forEach(function(bullet) {
@@ -30,9 +34,10 @@ EnemyTower.prototype = {
 	    enemy.kill();
 	},
 	create: function() {
-    this.sprite = this.game.add.sprite(this.game.world.randomX, this.game.world.randomY, 'enemy_tower');
+	    this.sprite = this.game.add.sprite(this.game.world.randomX, this.game.world.randomY, 'enemy_tower');
 	},
 	shoot: function() {
+	    console.log('Shooting!');
 	    enemy = new Enemy(this.game, this.player, this.sprite);
 	    this.bullets.push(enemy);
 	    enemy.create();
@@ -42,13 +47,12 @@ EnemyTower.prototype = {
 			if(this.shooting_speed > 600) {
 			    this.shooting_speed -= 100;
 			}
-			//if(this.shooting_speed > 10)
-			//{
-			//    this.shooting_speed -= 10;
-			//}
 			this.shoot();
 			this.startShooting();
 		}.bind(this), this.shooting_speed)
+	},
+	stopShooting: function() {
+	    clearInterval(this.shooting_interval);
 	}
 }
 

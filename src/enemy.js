@@ -19,7 +19,6 @@ Enemy.prototype = {
 		y: this.player.sprite.y,
 	    }
 	    this.game.physics.arcade.moveToObject(this.sprite, newPos, 500);
-	    console.log(this.ticks)
 	    this.ticks = this.ticks - 1;
 	}
     },
@@ -30,8 +29,6 @@ Enemy.prototype = {
 	this.sprite = this.game.add.sprite(this.position.x, this.position.y, 'enemy');
 
 	this.game.physics.arcade.enable(this.sprite);
-
-	
 
 	this.sprite.enableBody = true;
 
@@ -45,7 +42,6 @@ Enemy.prototype = {
 	    y: this.player.sprite.y,
 	}
 	this.game.physics.arcade.moveToObject(this.sprite, newPos, 500);
-
     }
 }
 
